@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+//#include <std_msgs::ColorRGBA.h>
 #include <actionlib/server/simple_action_server.h>
 
 #include <tf/transform_listener.h>
@@ -8,9 +9,9 @@
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
 #include <pcl/filters/passthrough.h>
-//#include <pcl/segmentaion/extract_clusters.h>
+#include <pcl/segmentation/extract_clusters.h>
 #include <pcl/filters/extract_indices.h>
-//#include <pcl/kdree_flann.h>
+#include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/segmentation/sac_segmentation.h>

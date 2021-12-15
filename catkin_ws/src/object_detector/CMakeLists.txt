@@ -8,7 +8,7 @@ project(object_detector)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(Boost REQUIRED system filesystem)
-find_package(PCL REQUIRED)
+find_package(PCL 1.8 REQUIRED)
 
 find_package(catkin REQUIRED COMPONENTS
   pcl_ros
@@ -74,7 +74,8 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate added messages and services with any dependencies listed here
  generate_messages(
    DEPENDENCIES
-   sensor_msgs   std_msgs
+   sensor_msgs   
+   std_msgs
  )
 
 ################################################
@@ -120,14 +121,15 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+ include
   ${catkin_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
 )
+link_directories(${PCL_LIBRARY_DIRS})
 
 add_executable(point_cloud_processor src/camera_subscriber.cpp)
-target_link_libraries(point_cloud_processor ${catkin_LIBRARIES})
+target_link_libraries(point_cloud_processor ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
