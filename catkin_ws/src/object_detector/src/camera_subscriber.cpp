@@ -1,7 +1,9 @@
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
-//#include <std_msgs::ColorRGBA.h>
-#include <actionlib/server/simple_action_server.h>
+#include <std_msgs/ColorRGBA.h>
+#include <object_msgs/DetectedObjects.h>
+
+//onlib/server/simple_action_server.h>
 
 #include <tf/transform_listener.h>
 
@@ -35,75 +37,87 @@ private:
 
 	// Parameters from goal
 	std::string arm_link_;
-	double block_size_;
-	double table_height_;
 
 	ros::Publisher block_pub_;
 	ros::Publisher c_obj_pub_;
 
+	//ROS_INFO("0.59");
 	// Parameters from node
 	std::vector<double> table_pose_;
-	std::vector<double> dock_pose_;
+	std::vector<geometry_msgs::Pose> blocks_poses;
+	std::vector<object_msgs::DetectedObjects> colored_blocks_poses;
 
-  void addBlock(float x, float y, float z, float angle, std_msgs::ColorRGBA rgba )
-  {
-    turtlebot2i_block_manipulation::BlockPose colored_block_pose;
-    geometry_msgs::Pose block_pose;
+	//initialize variables
+	//std::BlockDetectionResult result_;
+	//std::BlokDetectionFeedback feedback_;
 
-    block_pose.position.x = x;
-    block_pose.position.y = y;
-    block_pose.position.z = z;
+  //void addBlock(float x, float y, float z, float angle, std_msgs::ColorRGBA rgba )
+  //{
+    //object_msgs::DetectedObjects colored_block_pose;
+    //geometry_msgs::Pose block_pose;
 
-    Eigen::Quaternionf quat(Eigen::AngleAxis<float>(angle, Eigen::Vector3f(0,0,1)));
+    //block_pose.position.x = x;
+    //block_pose.position.y = y;
+    //block_pose.position.z = z;
 
-    block_pose.orientation.x = quat.x();
-    block_pose.orientation.y = quat.y();
-    block_pose.orientation.z = quat.z();
-    block_pose.orientation.w = quat.w();
+    //Eigen::Quaternionf quat(Eigen::AngleAxis<float>(angle, Eigen::Vector3f(0,0,1)));
 
-    result_.blocks.poses.push_back(block_pose);
+    //block_pose.orientation.x = quat.x();
+    //block_pose.orientation.y = quat.y();
+    //block_pose.orientation.z = quat.z();
+    //block_pose.orientation.w = quat.w();
 
-    colored_block_pose.position = block_pose.position;
-    colored_block_pose.orientation = block_pose.orientation;
-    colored_block_pose.color = rgba;
+    //blocks_poses.push_back(block_pose);
 
-    result_.colored_blocks.poses.push_back(colored_block_pose);
-  }
+    //colored_block_pose.position = block_pose.position;
+    //colored_block_pose.orientation = block_pose.orientation;
+    //colored_block_pose.color = rgba;
+
+    //colored_blocks_poses.push_back(colored_block_pose);
+  //}
 
 
 public:
 ObjectDetectServer(const std::string name) :
     nh_("~")
   {
+    ROS_INFO("0.6");
     // Subscribe to point cloud
-    sub_ = nh_.subscribe("/camera_sr300/depth_registered/points", 1, &BlockDetectionServer::cloudCb, this);
+    sub_ = nh_.subscribe("/camera_sr300/depth_registered/points", 1, &ObjectDetectServer::cloudCb, this);
 
     // Publish the filtered point cloud for debug purposes
-    pub_ = nh_.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("block_output", 1);
+    //pub_ = nh_.advertise< pcl::PointCloud<pcl::PointXYZRGB> >("block_output", 1);
 
     // Publish detected blocks poses
-    block_pub_ = nh_.advertise<geometry_msgs::PoseArray>("/turtlebot_blocks", 1, true);
+    //block_pub_ = nh_.advertise<geometry_msgs::Pose>("/turtlebot_blocks", 1, true);
 }
 
 void cloudCb(const sensor_msgs::PointCloud2ConstPtr& msg)
-  {
-
-    result_.blocks.header.stamp = msg->header.stamp;
-
+  { 
+     ROS_INFO("1");
+    //declare the size of object and the z coordinate of table
+    double block_size_ = 0.02;
+    double table_height_ = 0.0;
+    //colored_blocks_poses[1].header.stamp  = msg->header.stamp;
+    nh_.param<std::string>("/block_manipulation_demo/arm_link", arm_link_);
+    
     // convert to PCL
     pcl::PointCloud < pcl::PointXYZRGB > cloud;
     pcl::fromROSMsg(*msg, cloud);
 
     // transform to whatever frame we're working in, probably the arm frame.
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_transformed(new pcl::PointCloud<pcl::PointXYZRGB>);
+    ROS_INFO("1.6");
 
-    tf_listener_.waitForTransform(std::string(arm_link_), cloud.header.frame_id,
-                                  ros::Time::now(), ros::Duration(1.0));
+    tf_listener_.waitForTransform(std::string(arm_link_), cloud.header.frame_id, ros::Time::now(), ros::Duration(1.0));
+    ROS_INFO("1.7");
+
     if (!pcl_ros::transformPointCloud(std::string(arm_link_), cloud, *cloud_transformed, tf_listener_))
     {
       ROS_ERROR("Error converting to desired frame");
       return;
     }
+    ROS_INFO("2");
 
     // Create the segmentation object for the planar model and set all the parameters
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -116,7 +130,7 @@ void cloudCb(const sensor_msgs::PointCloud2ConstPtr& msg)
     seg.setMethodType(pcl::SAC_RANSAC);
     seg.setMaxIterations(200);
     seg.setDistanceThreshold(0.005);
-
+    ROS_INFO("3");
     // Limit to things we think are roughly at the table height.
     pcl::PassThrough<pcl::PointXYZRGB> pass;
     pass.setInputCloud(cloud_transformed);
@@ -146,7 +160,7 @@ void cloudCb(const sensor_msgs::PointCloud2ConstPtr& msg)
       }
 
       std::cout << "Inliers: " << (inliers->indices.size()) << std::endl;
-
+      ROS_INFO("4");
       // Extract the planar inliers from the input cloud
       pcl::ExtractIndices<pcl::PointXYZRGB> extract;
       extract.setInputCloud(cloud_filtered);
@@ -162,7 +176,7 @@ void cloudCb(const sensor_msgs::PointCloud2ConstPtr& msg)
       extract.setNegative(true);
       extract.filter(*cloud_filtered);
     }
-
+    ROS_INFO("5");
     // Creating the KdTree object for the search method of the extraction
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>);
     tree->setInputCloud(cloud_filtered);
@@ -177,7 +191,7 @@ void cloudCb(const sensor_msgs::PointCloud2ConstPtr& msg)
     ec.extract(cluster_indices);
 
     pub_.publish(cloud_filtered);
-
+    ROS_INFO("6");
     // for each cluster, see if it is a block
     for (size_t c = 0; c < cluster_indices.size(); ++c)
     {
@@ -231,7 +245,7 @@ void cloudCb(const sensor_msgs::PointCloud2ConstPtr& msg)
             zmax = std::max(zmax, z);
           }
       }
-
+      ROS_INFO("7");
       // Check if these dimensions make sense for the block size specified
       float xside = xmax-xmin;
       float yside = ymax-ymin;
@@ -266,7 +280,7 @@ void cloudCb(const sensor_msgs::PointCloud2ConstPtr& msg)
           ROS_ERROR( "Block Y was outisde bounds" );
           continue;
         }
-
+        ROS_INFO("7");
         ROS_INFO("Adding a new block! x=%.3f y=%.3f z=%.3f", (float) xmin , (float) ymin , (float) zmax );
 
         std_msgs::ColorRGBA rgba;
@@ -276,7 +290,7 @@ void cloudCb(const sensor_msgs::PointCloud2ConstPtr& msg)
 
         ROS_WARN_STREAM("New block color RGB: " << rgba.r << ", " << rgba.g << ", " << rgba.b << "; cluster size: " << cluster_indices[c].indices.size() );
 
-        addBlock(xmin , ymin , zmax , angle, rgba);
+        //addBlock(xmin , ymin , zmax , angle, rgba);
       }
       else
       {
@@ -285,10 +299,10 @@ void cloudCb(const sensor_msgs::PointCloud2ConstPtr& msg)
 
     }
 
-    if (result_.blocks.poses.size() > 0)
+    if (colored_blocks_poses.size() > 0)
     {
-      as_.setSucceeded(result_);
-      block_pub_.publish(result_.blocks);
+      //as_.setSucceeded(result_);
+      //block_pub_.publish(result_.blocks);
       ROS_INFO("[block detection] Succeeded!");
     }
     else
@@ -301,8 +315,10 @@ void cloudCb(const sensor_msgs::PointCloud2ConstPtr& msg)
 };
 
 int main(int argc,char **argv){
-	
-	ros::init(argc,argv,"realsense_image_processor");
-	std::ObjectDetectServer server("block_detection");
+	ros::init(argc,argv,"block_detection_server");
+        ROS_INFO("0.5");
+	ObjectDetectServer server("object_detection");
 	ros::spin();
+	return 0;
 }
+
